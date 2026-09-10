@@ -562,3 +562,21 @@ earns its place.
 volatility, BOM exposure and coverage data. They are not financial or investment advice.
 Forecasts are statistical projections with back-tested error bands, not guarantees of future
 market levels.*
+
+---
+
+## Running it as a background service (macOS)
+
+The scheduler lives inside the app, so the daily/weekly/monthly jobs only run while it
+is running. To keep it up across reboots without leaving a terminal window open, a
+launch agent is installed at
+`~/Library/LaunchAgents/com.transformerprocure.dashboard.plist`:
+
+```bash
+launchctl load   ~/Library/LaunchAgents/com.transformerprocure.dashboard.plist   # start
+launchctl unload ~/Library/LaunchAgents/com.transformerprocure.dashboard.plist   # stop
+launchctl list | grep transformerprocure                                          # status
+```
+
+It binds to `127.0.0.1` only — reachable from this machine, not from the network.
+Logs go to `reports/service.log`.
