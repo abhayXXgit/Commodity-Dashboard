@@ -15,7 +15,12 @@ name: Build and publish the dashboard
 
 on:
   schedule:
-    - cron: "0 1 * * *"        # 01:00 UTC = 06:30 IST, daily
+    # 06:30 and 13:30 IST. Twice is plenty: the exchange-rate provider only
+    # publishes once a day, so building more often would burn minutes to
+    # republish identical numbers. The page polls for a new build and reloads
+    # itself when one appears, so nobody has to remember to refresh.
+    - cron: "0 1 * * *"        # 01:00 UTC = 06:30 IST
+    - cron: "0 8 * * *"        # 08:00 UTC = 13:30 IST
   push:
     branches: [main]
   workflow_dispatch:            # lets you rebuild on demand from the Actions tab
@@ -124,6 +129,24 @@ jobs:
           mkdir -p _site
           cp frontend/standalone.html _site/index.html
           cp frontend/standalone.html "_site/dashboard-$(date +%Y-%m-%d).html"
+
+          # A few hundred bytes the page can poll cheaply to notice a new build.
+          # It carries the same generated_at the page was built with, so the
+          # comparison is exact rather than a guess based on time.
+          python - <<'PY'
+          import base64, json, re, pathlib
+          h = pathlib.Path("frontend/standalone.html").read_text(encoding="utf-8")
+          d = json.loads(base64.b64decode(
+              re.search(r'type="application/base64">([^<]+)<', h).group(1)))
+          pathlib.Path("_site/version.json").write_text(json.dumps({
+              "generated_at": d["generated_at"],
+              "usdinr": d["parity"]["usdinr"],
+              "series": len(d["series"]),
+              "projects": len(d["rollup"]["transformers"]),
+          }), encoding="utf-8")
+          print("version.json ->", pathlib.Path("_site/version.json").read_text())
+          PY
+
           ls -lh _site
           echo "Built $(date -u +'%Y-%m-%d %H:%M UTC')"
 
