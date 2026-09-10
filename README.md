@@ -579,6 +579,49 @@ market levels.*
 
 ---
 
+## Publishing a live URL (GitHub Pages)
+
+Emailing a file means whoever has it is looking at whatever day you sent it. Publishing to
+GitHub Pages gives one URL that always serves a build made that morning.
+
+`.github/workflows/publish-dashboard.yml` runs daily at 01:00 UTC (06:30 IST), on every
+push to `main`, and on demand from the Actions tab. Each run:
+
+1. builds a fresh database and seeds the demo series;
+2. **fetches live exchange rates** from a public API;
+3. ingests any producer circular committed to `data/imports/`;
+4. retrains the forecast models;
+5. rebuilds `standalone.html` and publishes it as the site index.
+
+### Turning it on
+
+1. The repository must be **public** (GitHub Pages is a paid feature on private repos).
+2. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+3. Push. The first run appears under the **Actions** tab.
+
+The URL is `https://<username>.github.io/<repository>/` — bookmarkable, always current,
+nothing to install for whoever opens it.
+
+Each run also keeps a dated copy at `dashboard-YYYY-MM-DD.html`, so you can point at the
+build a decision was taken on.
+
+### What is and is not fresh
+
+**Fresh every run:** exchange rates, the build date, every date-relative figure, and any
+circular you have committed.
+
+**Not fresh:** LME copper. It is licensed and cannot be fetched from a public runner, so
+those series stay `DEMO_DATA` and the dashboard keeps saying so. Connecting real copper
+needs an entitled endpoint and a self-hosted runner, or a private deployment.
+
+### Before you publish
+
+A public Pages site is readable by anyone with the link — search engines included. This
+dashboard names customers and carries BOM consumption figures. If that is not intended for
+public view, keep the repository private and deploy somewhere access-controlled instead.
+
+---
+
 ## Running it as a background service (macOS)
 
 The scheduler lives inside the app, so the daily/weekly/monthly jobs only run while it

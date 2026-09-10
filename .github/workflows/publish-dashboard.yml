@@ -1,0 +1,110 @@
+name: Build and publish the dashboard
+
+# Rebuilds the offline dashboard every morning and publishes it to GitHub Pages,
+# so the URL you give people always serves a build made that day rather than a
+# file someone emailed weeks ago.
+#
+# What is genuinely fresh on each run:
+#   - exchange rates (fetched live from a public API during the build)
+#   - the build date and every date-relative figure
+#   - any producer circular committed to data/imports/
+#
+# What is NOT fresh: LME copper. That data is licensed and cannot be fetched
+# from a public runner. Those series stay labelled DEMO_DATA and the dashboard
+# says so on every page.
+
+on:
+  schedule:
+    - cron: "0 1 * * *"        # 01:00 UTC = 06:30 IST, daily
+  push:
+    branches: [main]
+  workflow_dispatch:            # lets you rebuild on demand from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build the database and seed the demo series
+        env:
+          DATA_MODE: DEMO
+          ENABLE_SCHEDULER: "false"
+          BOOTSTRAP_FORECASTS: "false"
+        run: python backend/main.py --seed --no-serve
+
+      - name: Fetch live exchange rates and ingest any committed circulars
+        env:
+          FX_API_URL: https://open.er-api.com/v6/latest
+          FALLBACK_USDINR: "95.12"
+          FALLBACK_EURINR: "110.66"
+          ENABLE_SCHEDULER: "false"
+        run: |
+          python - <<'PY'
+          from backend.services.etl import daily_job
+          out = daily_job()
+          print("FX:", out["fx"]["status"])
+          for r in out["fx"]["rates"]:
+              print(f"   {r['pair']} = {r['rate']}  [{r['class']}]")
+          for s in out["prices"]["sources"]:
+              print(f"   {s['adapter']:22s} {s['status']:12s} inserted={s['inserted']}")
+          print("alerts raised:", out["alerts"]["count"])
+          PY
+
+      - name: Train the forecast models
+        env:
+          ENABLE_SCHEDULER: "false"
+        run: |
+          python - <<'PY'
+          from backend.services.forecast_service import refresh_forecasts
+          out = refresh_forecasts(folds=2)
+          print(f"{len(out['succeeded'])} series trained, {len(out['failed'])} failed")
+          for f in out["failed"]:
+              print("   FAILED:", f)
+          PY
+
+      - name: Build the single-file dashboard
+        run: python -m backend.services.build_standalone
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp frontend/standalone.html _site/index.html
+          cp frontend/standalone.html "_site/dashboard-$(date +%Y-%m-%d).html"
+          ls -lh _site
+          echo "Built $(date -u +'%Y-%m-%d %H:%M UTC')"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
