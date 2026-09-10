@@ -1,0 +1,10 @@
+# Development / test dependencies.
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# Kept separate from requirements.txt so a production image does not ship a
+# test runner. The application itself needs none of these.
+
+pytest==8.3.4
+httpx==0.28.1          # required by fastapi.testclient
+ruff==0.8.4            # linting
+pypdf==5.1.0           # used to assert on generated PDF content

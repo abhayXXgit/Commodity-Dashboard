@@ -1,0 +1,30 @@
+# ---- web layer ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+jinja2==3.1.5
+
+# ---- data / persistence ----
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3        # PostgreSQL driver (SQLite needs nothing)
+alembic==1.14.0
+python-dotenv==1.0.1
+
+# ---- analytics & forecasting ----
+pandas==2.2.3
+numpy==2.1.3
+scikit-learn==1.6.0
+statsmodels==0.14.4
+scipy==1.14.1
+
+# ---- excel / reporting ----
+openpyxl==3.1.5
+XlsxWriter==3.2.0
+reportlab==4.2.5
+
+# ---- scheduling ----
+APScheduler==3.11.0
+
+# ---- optional: adds Prophet to the forecast back-test ----
+# Heavy (pulls cmdstan). Holt-Winters damped trend covers the same job without it.
+# prophet==1.1.6

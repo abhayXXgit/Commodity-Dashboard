@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Procurement KPI Scorecard — TransformerProcure</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F0A202'/><text y='72' x='50' font-size='62' text-anchor='middle' font-family='monospace' font-weight='700'>K</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-main">
+    <div class="brand">
+      <div class="brand-mark">K</div>
+      <div class="brand-text"><b>Procurement KPI Scorecard</b>
+        <span>Supply chain performance &amp; historical BOM cost back-test</span></div>
+    </div>
+    <nav class="nav">
+      <button onclick="location.href='/'">← Full dashboard</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="pill" id="modePill"><span class="dot"></span>—</span>
+      <a class="btn sm" href="/api/data/export/pdf" target="_blank">PDF</a>
+      <a class="btn sm" href="/api/data/export/excel" download>Workbook</a>
+      <button class="btn" onclick="window.print()">Print</button>
+    </div>
+  </div>
+  <div id="bannerHost"></div>
+</header>
+
+<main>
+  <div class="section">
+    <div class="section-head"><h2>Scorecard</h2>
+      <span class="sub">Buying performance measured against the market benchmark over the purchase window</span></div>
+    <div class="grid g2" id="procKpis"><div class="loading"><span class="spinner"></span></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Coverage &amp; uncovered exposure</h2></div>
+    <div class="card pad0"><div id="coverageTable"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Historical transformer cost back-test</h2>
+      <span class="sub">BOM consumption held constant — isolates the commodity effect from design change</span>
+      <span class="spacer"></span>
+      <select id="jobSelect" onchange="KPI.setJob(this.value)"></select></div>
+    <div class="grid g32">
+      <div class="card"><div id="chartCostBacktest" class="chart lg"></div></div>
+      <div class="card"><div class="card-head"><h3>Detail</h3></div><div id="backtestMeta"></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Commodity price vs transformer material cost</h2></div>
+    <div class="card"><div id="chartPriceVsCost" class="chart"></div>
+      <div class="card-note">Both lines are indexed to 100 at the start of the window so the
+        pass-through from commodity price into transformer material cost is directly readable.</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Supplier performance</h2></div>
+    <div class="card pad0"><div id="supplierTable"></div></div>
+  </div>
+</main>
+
+<footer>
+  Procurement decision-support metrics. Purchase timing gain compares the realised average
+  buying price against the market benchmark average over the same window; a positive figure
+  means buying was timed better than the benchmark. Not financial advice.
+</footer>
+
+<script src="/assets/echarts.min.js"></script>
+<script>if(typeof echarts==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"><\/script>')}</script>
+<script src="/js/util.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/charts.js"></script>
+<script>
+const KPI = (() => {
+  const state = { job: '' };
+
+  async function load() {
+    const d = await API.all({
+      kpis: API.procKpis(), cov: API.coverage(), bt: API.costBacktest(state.job || null),
+      quotes: API.quotes(), live: API.live(), cfg: API.config(), trf: API.transformers(),
+    });
+
+    if (d.cfg) {
+      const n = U.el('modePill');
+      n.className = 'pill ' + (d.cfg.data_mode === 'DEMO' ? 'demo' : 'live');
+      n.innerHTML = `<span class="dot"></span>${d.cfg.data_mode}`;
+    }
+    if (d.live?.demo_data) {
+      U.html('bannerHost', `<div class="banner warn">
+        <span class="pill demo"><span class="dot"></span>Demo data</span>
+        <span><b>Simulated price history.</b> These KPIs are computed correctly but from
+        generated prices, not market data.</span></div>`);
+    }
+
+    if (d.trf) {
+      U.el('jobSelect').innerHTML = '<option value="">Portfolio average</option>' +
+        d.trf.transformers.map(t => `<option value="${U.esc(t.job_no)}" ${state.job === t.job_no ? 'selected' : ''}>${U.esc(t.job_no)} — ${t.rating_mva} MVA</option>`).join('');
+    }
+
+    if (d.kpis) {
+      U.html('procKpis', Object.values(d.kpis.kpis).map(k => {
+        const gain = k.purchase_timing_gain_total;
+        return `<div class="card">
+          <div class="card-head"><h3>${k.commodity} — supply chain KPIs</h3>
+            <span class="spacer"></span>
+            <span class="tag ${gain > 0 ? 'good' : gain < 0 ? 'bad' : 'flat'}">
+              timing ${gain > 0 ? 'gain' : 'loss'} ${U.inr(Math.abs(gain))}</span></div>
+          <dl class="kv">
+            <dt>Market price</dt><dd>${U.rs(k.market_price)}</dd>
+            <dt>Benchmark average (window)</dt><dd>${U.rs(k.benchmark_avg_period)}</dd>
+            <dt>Average buying price</dt><dd>${U.rs(k.average_buying_price)}</dd>
+            <dt>Purchase timing gain / MT</dt><dd>${U.rs(k.purchase_timing_gain_per_mt)}</dd>
+            <dt>Price avoidance (total)</dt><dd>${U.inr(k.price_avoidance)}</dd>
+            <dt>Quantity purchased</dt><dd>${U.num(k.quantity_purchased_mt, 2)} MT</dd>
+            <dt>Total spend</dt><dd>${U.inr(k.total_spend)}</dd>
+            <dt>BOM rate</dt><dd>${U.rs(k.bom_rate)}</dd>
+            <dt>BOM rate vs market</dt><dd>${U.pct(k.bom_vs_market_pct)}</dd>
+            <dt>Market vs average PO rate</dt><dd>${U.pct(k.market_vs_po_pct)}</dd>
+            <dt>Coverage</dt><dd>${U.num(k.coverage_pct, 1)}%</dd>
+            <dt>Open PO coverage</dt><dd>${U.num(k.open_po_coverage_pct, 1)}%</dd>
+            <dt>Commodity cost exposure</dt><dd>${U.inr(k.commodity_cost_exposure)}</dd>
+            <dt>Uncovered exposure</dt><dd>${U.inr(k.uncovered_exposure)}</dd>
+            <dt>Best supplier</dt><dd>${U.esc(k.best_supplier || '—')}</dd>
+            <dt>Best landed cost</dt><dd>${U.rs(k.best_supplier_landed)}</dd>
+            <dt>Worst supplier</dt><dd>${U.esc(k.worst_supplier || '—')}</dd>
+            <dt>Worst landed cost</dt><dd>${U.rs(k.worst_supplier_landed)}</dd>
+            <dt>Supplier price variance</dt><dd>${U.pct(k.supplier_price_variance_pct)}</dd>
+            <dt>Forecast accuracy (MAPE)</dt><dd>${U.num(k.forecast_accuracy_mape, 2)}%</dd>
+            <dt>Selected model</dt><dd style="font-size:10px">${U.esc(k.forecast_model || '—')}</dd>
+          </dl></div>`;
+      }).join(''));
+    }
+
+    if (d.cov) {
+      U.html('coverageTable', U.table([
+        { label: 'Commodity', key: 'commodity', cls: 'mono' },
+        { label: 'Requirement MT', num: true, render: r => U.num(r.requirement_mt, 2) },
+        { label: 'Stock', num: true, render: r => U.num(r.stock_mt, 2) },
+        { label: 'Open PO', num: true, render: r => U.num(r.open_po_mt, 2) },
+        { label: 'Confirmed', num: true, render: r => U.num(r.confirmed_mt, 2) },
+        { label: 'Uncovered MT', num: true, render: r => `<b>${U.num(r.uncovered_mt, 2)}</b>` },
+        { label: 'Coverage %', num: true, render: r => r.tracked && r.coverage_pct != null
+            ? U.num(r.coverage_pct, 1) : '<span class="tag flat">not tracked</span>' },
+        { label: 'Avg PO rate', num: true, render: r => U.rs(r.avg_po_rate) },
+        { label: 'Market vs PO', num: true, render: r => U.chg(r.po_vs_market_pct) },
+        { label: 'Lead days', num: true, render: r => r.lead_time_days ?? '—' },
+        { label: 'Uncovered exposure', num: true, render: r =>
+            r.uncovered_exposure == null ? '—' : U.inr(r.uncovered_exposure) },
+      ], d.cov.rows));
+    }
+
+    if (d.bt?.available) {
+      const b = d.bt;
+      Charts.multiLine('chartCostBacktest', b.series.map(p => p.date), [
+        { name: 'Total transformer cost', data: b.series.map(p => p.total_cost), color: Charts.C.amber },
+        { name: 'Material cost only', data: b.series.map(p => p.material_cost), color: Charts.C.blue },
+      ], { unit: 'INR / transformer', zoom: true });
+
+      U.html('backtestMeta', `<dl class="kv">
+        <dt>Scope</dt><dd>${U.esc(b.label)}</dd>
+        <dt>Base cost</dt><dd>${U.inr(b.base_cost)}</dd>
+        <dt>Lowest historical cost</dt><dd>${U.inr(b.min_cost)}</dd>
+        <dt>Highest historical cost</dt><dd>${U.inr(b.max_cost)}</dd>
+        <dt>Current cost</dt><dd><b>${U.inr(b.current_cost)}</b></dd>
+        <dt>Peak-to-trough swing</dt><dd>${U.num(b.swing_pct, 1)}%</dd>
+        ${Object.entries(b.consumption_mt).map(([k, v]) =>
+          `<dt>${U.esc(k)} consumption</dt><dd>${U.num(v, 4)} MT</dd>`).join('')}
+      </dl><div class="card-note">${U.esc(b.note)}</div>`);
+
+      // indexed comparison: copper price vs material cost
+      const px = b.series.map(p => p.px_CU).filter(v => v != null);
+      if (px.length) {
+        const base = px[0], mbase = b.series[0].material_cost;
+        Charts.multiLine('chartPriceVsCost', b.series.map(p => p.date), [
+          { name: 'Copper price (indexed)', data: b.series.map(p => p.px_CU ? +(p.px_CU / base * 100).toFixed(2) : null), color: Charts.C.teal },
+          { name: 'Transformer material cost (indexed)', data: b.series.map(p => +(p.material_cost / mbase * 100).toFixed(2)), color: Charts.C.amber },
+        ], { unit: 'index (start = 100)' });
+      }
+    }
+
+    if (d.quotes) {
+      U.html('supplierTable', U.table([
+        { label: 'Supplier', render: r => U.esc(r.supplier) },
+        { label: 'Commodity / product', render: r => `${U.esc(r.commodity)} / ${U.esc(r.product || '—')}` },
+        { label: 'Quote date', render: r => U.date(r.quote_date) },
+        { label: 'Basic INR/MT', num: true, render: r => U.rs(r.effective_price) },
+        { label: 'Landed cost', num: true, render: r => `<b>${U.rs(r.landed_cost)}</b>` },
+        { label: 'Benchmark', num: true, render: r => U.rs(r.benchmark) },
+        { label: 'Variance', num: true, render: r => U.chg(r.variance_pct) },
+        { label: 'vs previous quote', num: true, render: r => r.variance_vs_prev != null ? U.rs(r.variance_vs_prev) : '—' },
+        { label: 'Lead days', num: true, render: r => r.delivery_days ?? '—' },
+        { label: 'Status', render: r => {
+            const m = { 'BEST PRICE': 'good', 'BELOW MARKET': 'good',
+                        'ABOVE MARKET': 'bad', 'EXPIRED QUOTE': 'warn' };
+            return r.status_flag ? `<span class="tag ${m[r.status_flag] || 'flat'}">${U.esc(r.status_flag)}</span>` : '—'; } },
+      ], d.quotes.quotes, { rowClass: r => r.status_flag === 'BEST PRICE' ? 'best' : '' }));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+  return { setJob: (j) => { state.job = j; load(); } };
+})();
+</script>
+</body>
+</html>

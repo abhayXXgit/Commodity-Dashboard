@@ -1,0 +1,16 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+*.db
+*.db-wal
+*.db-shm
+data/forecast_cache/
+reports/*.pdf
+reports/*.xlsx
+reports/*.log
+.pytest_cache/
+.DS_Store
+.idea/
+.vscode/

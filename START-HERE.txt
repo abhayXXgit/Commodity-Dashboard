@@ -1,0 +1,88 @@
+================================================================================
+  TransformerProcure Intelligence v2.0
+  Commodity price tracking, forecasting and transformer BOM cost exposure
+================================================================================
+
+WHAT'S IN THIS FOLDER
+---------------------
+Three ways to use this, easiest first.
+
+
+1. JUST LOOK AT IT  -  no installation, works offline
+   ---------------------------------------------------
+   Open:  frontend/standalone.html
+   Double-click it. It opens in your browser.
+
+   Everything works: all the charts, the BOM exposure, the what-if simulator,
+   supplier quotes, the KPI scorecard. No Python, no server, no internet.
+   Email this one file to anyone and it works on their machine too.
+
+   Note: it is a snapshot, frozen at the moment it was built. It cannot fetch
+   new prices.
+
+
+2. RUN THE FULL APP  -  live data, imports, alerts, PDF export
+   -------------------------------------------------------------
+   Mac / Linux :  double-click  start-mac-linux.command
+   Windows     :  double-click  start-windows.bat
+
+   The first run installs what it needs (2-3 minutes). After that it starts in
+   seconds and opens http://127.0.0.1:8000 in your browser automatically.
+
+   If your Mac blocks the file: right-click it, choose Open, then Open again.
+
+   Prefer to do it by hand?
+       python -m venv venv
+       source venv/bin/activate        (Windows: venv\Scripts\activate)
+       pip install -r requirements.txt
+       python backend/main.py
+
+
+3. THE MANAGEMENT REPORT
+   ----------------------
+   reports/commodity_exposure_report.pdf  -  already generated, ready to print.
+   The running app regenerates it any time from Reports -> Management PDF.
+
+
+IMPORTANT - ABOUT THE PRICES
+----------------------------
+The prices shipped in this build are SIMULATED. They are realistic and clearly
+labelled DEMO DATA on every screen, but they are not the market.
+
+The calculations, forecasting and decision logic are all real. What is missing
+is a live price feed, and that is deliberate: the system will never invent a
+price. If a source is not connected it says "Live data unavailable - last
+verified price shown" rather than showing you a number you might act on.
+
+TO PUT REAL PRICES IN:
+
+  Aluminium (easiest - no IT project needed)
+      Save the official NALCO / BALCO / Hindalco price circular into
+      data/imports/ with the producer's name in the filename, for example
+          nalco_2026-09.xlsx
+      Then press "Refresh data" in the dashboard. It reads it automatically.
+      A working sample is already in that folder.
+
+  Any spreadsheet you already keep
+      Historical data -> Upload workbook. Tick "validate only" first to see
+      what it would do. Every rejected row tells you why.
+
+  Copper / LME
+      Needs a feed your company is licensed for. Copy .env.example to .env
+      and set LME_API_URL (and LME_API_KEY if required). One line.
+
+
+WHERE TO READ MORE
+------------------
+README.md  -  full documentation: how the forecasting picks its model, how the
+              procurement signal is calculated, every API endpoint, how to add
+              a new commodity or supplier.
+
+
+A NOTE ON THE RECOMMENDATIONS
+-----------------------------
+BUY NOW / BUY PARTIAL / LOCK PRICE / WAIT and the rest are procurement
+decision-support signals built from price, forecast, volatility, BOM exposure
+and coverage. They are not financial or investment advice. Forecasts are
+statistical projections with error bands, not guarantees.
+================================================================================

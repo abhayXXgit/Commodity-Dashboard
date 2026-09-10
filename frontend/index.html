@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TransformerProcure Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F0A202'/><text y='72' x='50' font-size='62' text-anchor='middle' font-family='monospace' font-weight='700'>T</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-main">
+    <div class="brand">
+      <div class="brand-mark">TP</div>
+      <div class="brand-text">
+        <b>TransformerProcure</b>
+        <span>Commodity &amp; BOM exposure intelligence</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button data-page="dashboard" class="active">Dashboard</button>
+      <button data-page="copper">Copper</button>
+      <button data-page="aluminium">Aluminium</button>
+      <button data-page="historical">Historical data</button>
+      <button data-page="forecast">Forecast</button>
+      <button data-page="bom">BOM &amp; exposure</button>
+      <button data-page="quotes">Supplier quotes</button>
+      <button data-page="alerts">Alerts</button>
+      <button data-page="reports">Reports</button>
+      <button data-page="settings">Settings</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="pill" id="modePill"><span class="dot"></span>—</span>
+      <span class="pill" id="statusPill"><span class="dot"></span>Loading</span>
+      <button class="btn primary" id="btnRefresh">Refresh data</button>
+    </div>
+  </div>
+  <div id="bannerHost"></div>
+</header>
+
+<main>
+
+<!-- ============================ DASHBOARD ============================ -->
+<section class="page active" id="page-dashboard">
+  <div class="section">
+    <div class="section-head"><h2>Executive KPIs</h2>
+      <span class="sub">Green = price falling (favourable for procurement) · red = rising (adverse) · grey = unchanged or no reliable data</span></div>
+    <div class="grid g5" id="kpiStrip"><div class="loading"><span class="spinner"></span></div></div>
+  </div>
+
+  <div class="section" id="execBlock"></div>
+
+  <div class="section">
+    <div class="section-head"><h2>Procurement decision support</h2>
+      <span class="sub">Signals, not financial advice</span></div>
+    <div class="grid g2" id="signalBlock"></div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Management summary</h3>
+        <span class="spacer"></span><span class="tag info">generated from live data</span></div>
+      <div id="summaryBlock"><div class="loading"><span class="spinner"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Open alerts</h3><span class="spacer"></span>
+        <button class="btn sm" onclick="App.go('alerts')">View all</button></div>
+      <div id="dashAlerts"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Material-wise cost impact</h2>
+      <span class="sub">Price change × BOM consumption × transformer quantity</span></div>
+    <div class="card pad0"><div id="impactTable"></div></div>
+  </div>
+
+  <div class="section grid g23">
+    <div class="card">
+      <div class="card-head"><h3>Procurement coverage</h3></div>
+      <div id="coverageTable"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Commodity exposure by delivery month</h3></div>
+      <div id="chartMonthly" class="chart"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== COPPER ============================= -->
+<section class="page" id="page-copper">
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Copper cathode — India reference</h3>
+        <span class="spacer"></span><span class="tag info">3-year history</span></div>
+      <div id="chartCuPrice" class="chart lg"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Statistics</h3></div><div id="cuStats"></div></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card">
+      <div class="card-head"><h3>LME parity vs Indian reference</h3></div>
+      <div id="chartCuParity" class="chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Premium over LME equivalent</h3></div>
+      <div id="chartCuPremium" class="chart"></div>
+    </div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card"><div class="card-head"><h3>Basis analysis</h3></div><div id="cuParity"></div></div>
+    <div class="card"><div class="card-head"><h3>Copper procurement signal</h3></div><div id="cuReco"></div></div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card"><div class="card-head"><h3>Copper forecast</h3></div>
+      <div id="chartCuForecast" class="chart"></div></div>
+    <div class="card pad0"><div id="cuForecastTable"></div></div>
+  </div>
+</section>
+
+<!-- ============================ ALUMINIUM =========================== -->
+<section class="page" id="page-aluminium">
+  <div class="section">
+    <div class="section-head"><h2>Producer comparison</h2>
+      <span class="sub">NALCO · BALCO/Vedanta · Hindalco — lowest commercial price highlighted</span></div>
+    <div class="grid g3" id="alCompare"></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card">
+      <div class="card-head"><h3>Current price by producer and product</h3></div>
+      <div id="chartAlProviders" class="chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Historical producer spread — ingot</h3></div>
+      <div id="chartAlSpread" class="chart"></div>
+    </div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>NALCO ingot price history</h3></div>
+      <div id="chartAlPrice" class="chart"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Statistics</h3></div><div id="alStats"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Provider × product statistics</h2></div>
+    <div class="card pad0"><div id="alStatsTable"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="card"><div class="card-head"><h3>Aluminium procurement signal</h3></div>
+      <div id="alReco"></div></div>
+  </div>
+</section>
+
+<!-- =========================== HISTORICAL ========================== -->
+<section class="page" id="page-historical">
+  <div class="filters" style="margin:-16px -18px 16px;border-radius:0">
+    <div class="field"><label>Commodity</label><select id="fCommodity"></select></div>
+    <div class="field"><label>Provider</label><select id="fProvider"></select></div>
+    <div class="field"><label>Product</label><select id="fProduct"></select></div>
+    <div class="field"><label>Period</label>
+      <div class="seg" id="periodSeg">
+        <button data-period="7D">7D</button><button data-period="30D">30D</button>
+        <button data-period="90D">3M</button><button data-period="180D">6M</button>
+        <button data-period="365D" class="active">1Y</button>
+        <button data-period="3Y">3Y</button><button data-period="5Y">5Y</button>
+      </div>
+    </div>
+    <div class="field"><label>&nbsp;</label>
+      <div style="display:flex;gap:6px">
+        <a class="btn sm" href="/api/data/export/excel" download>Export Excel</a>
+        <a class="btn sm" href="/api/data/export/csv" download>Export CSV</a>
+        <a class="btn sm" href="/api/data/export/pdf" target="_blank">PDF report</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Daily price with moving averages</h3></div>
+      <div id="chartHistory" class="chart lg"></div>
+      <div id="histMeta"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Statistics</h3></div><div id="histStats"></div></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card">
+      <div class="card-head"><h3>Monthly average, high and low</h3></div>
+      <div id="chartWeekly" class="chart"></div>
+    </div>
+    <div class="card pad0">
+      <div style="padding:13px 14px 0"><h3 style="font-size:12.5px">Monthly aggregates</h3></div>
+      <div id="histTable" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Import price data</h2>
+      <span class="sub">Official producer circulars, exchange exports or internal ERP extracts</span></div>
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-head"><h3>Upload workbook</h3></div>
+        <p class="muted" style="font-size:11.5px">
+          Accepts .xlsx, .xls and .csv. Required columns: date, commodity, provider, price.
+          Optional: product, grade, currency, unit, basis, premium, freight, location, source, remarks.
+          Every row is validated — negative prices, unknown codes, future dates and duplicates
+          are rejected with a reason rather than silently dropped.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv"
+                 onchange="App.uploadFile(this)" style="font-size:11px">
+          <label style="font-size:11.5px;display:flex;align-items:center;gap:5px">
+            <input type="checkbox" id="dryRun" checked> validate only (dry run)</label>
+          <a class="btn sm" href="/api/data/template" download>Download template</a>
+        </div>
+      </div>
+      <div class="card"><div class="card-head"><h3>Import result</h3></div><div id="importResult"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FORECAST =========================== -->
+<section class="page" id="page-forecast">
+  <div class="filters" style="margin:-16px -18px 16px;border-radius:0">
+    <div class="field"><label>Commodity</label>
+      <select onchange="App.setFcCommodity(this.value)">
+        <option value="CU">Copper</option><option value="AL">Aluminium</option>
+        <option value="CRGO">CRGO</option><option value="STEEL">Steel</option>
+        <option value="OIL">Transformer oil</option>
+      </select></div>
+    <div class="field"><label>&nbsp;</label>
+      <button class="btn" id="btnRefreshFull">Retrain models</button></div>
+    <div class="field" style="flex:1"><label>&nbsp;</label>
+      <span class="faint" style="font-size:11px;padding-top:6px;display:block">
+        Retraining back-tests every model at every horizon. It takes a few minutes and
+        runs in the background.</span></div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Forecast with 95% confidence band</h3>
+        <span class="spacer"></span><span class="tag warn">Forecast</span></div>
+      <div id="chartForecast" class="chart lg"></div>
+    </div>
+    <div class="card pad0"><div id="forecastTable"></div></div>
+  </div>
+
+  <div class="section" id="fcContext"></div>
+
+  <div class="section">
+    <div class="section-head"><h2>Model selection evidence</h2>
+      <span class="sub">Why this model won — rolling-origin back-test at each horizon</span></div>
+    <div class="grid g3" id="leaderboard"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Volatility across commodities</h2></div>
+    <div class="card pad0"><div id="volTable"></div></div>
+  </div>
+</section>
+
+<!-- =========================== BOM & EXPOSURE ====================== -->
+<section class="page" id="page-bom">
+  <div class="filters" style="margin:-16px -18px 16px;border-radius:0">
+    <div class="field"><label>Project</label>
+      <select id="bomJobSelect" onchange="App.setJob(this.value)"></select></div>
+    <div class="field"><label>Commodity focus</label>
+      <select onchange="App.setSensCommodity(this.value)">
+        <option value="CU">Copper</option><option value="AL">Aluminium</option>
+        <option value="CRGO">CRGO</option><option value="STEEL">Steel</option>
+        <option value="OIL">Transformer oil</option>
+      </select></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Transformer master &amp; BOM exposure</h2></div>
+    <div class="card pad0"><div id="bomTransformers"></div></div>
+  </div>
+
+  <div class="section grid g23">
+    <div class="card"><div class="card-head"><h3>Requirement by commodity</h3></div>
+      <div id="bomByCommodity"></div></div>
+    <div class="card"><div class="card-head"><h3>Exposure mix</h3></div>
+      <div id="chartExposureMix" class="chart"></div></div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Transformer cost waterfall</h3>
+        <span class="spacer"></span><span class="sub faint">base → commodity impacts → revised</span></div>
+      <div id="chartWaterfall" class="chart"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Waterfall detail</h3></div>
+      <div id="waterfallMeta"></div></div>
+  </div>
+
+  <div class="section grid g23">
+    <div class="card"><div class="card-head"><h3>Price sensitivity −20% to +20%</h3></div>
+      <div id="chartSensitivity" class="chart"></div></div>
+    <div class="card pad0"><div id="sensTable"></div></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card">
+      <div class="card-head"><h3>What-if simulator</h3></div>
+      <form onsubmit="App.runWhatIf(event)">
+        <div class="grid g2" style="gap:8px">
+          <div class="field"><label>Commodity</label>
+            <select name="commodity"><option value="CU">Copper</option>
+              <option value="AL">Aluminium</option><option value="CRGO">CRGO</option>
+              <option value="STEEL">Steel</option><option value="OIL">Oil</option></select></div>
+          <div class="field"><label>Scenario price INR/MT</label>
+            <input type="number" name="scenario_price" step="0.01" required placeholder="950000"></div>
+          <div class="field"><label>Current price (blank = market)</label>
+            <input type="number" name="current_price" step="0.01" placeholder="auto"></div>
+          <div class="field"><label>Consumption MT/transformer</label>
+            <input type="number" name="consumption_mt" step="0.0001" placeholder="auto from BOM"></div>
+          <div class="field"><label>Transformer quantity</label>
+            <input type="number" name="quantity" step="1" placeholder="auto from order book"></div>
+          <div class="field"><label>&nbsp;</label>
+            <button class="btn primary" type="submit">Calculate impact</button></div>
+        </div>
+      </form>
+      <div id="whatIfResult" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Price locking calculator</h3></div>
+      <form onsubmit="App.runLock(event)">
+        <div class="grid g2" style="gap:8px">
+          <div class="field"><label>Commodity</label>
+            <select name="commodity"><option value="CU">Copper</option>
+              <option value="AL">Aluminium</option></select></div>
+          <div class="field"><label>Quantity MT (blank = uncovered)</label>
+            <input type="number" name="quantity_mt" step="0.001" placeholder="auto"></div>
+          <div class="field"><label>Lock period (days)</label>
+            <input type="number" name="lock_period_days" value="90" min="1" max="730"></div>
+          <div class="field"><label>Supplier premium INR/MT</label>
+            <input type="number" name="supplier_premium" value="0" step="1"></div>
+        </div>
+        <button class="btn primary" type="submit" style="margin-top:8px">Analyse lock</button>
+      </form>
+      <div id="lockResult" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div class="section grid g23">
+    <div class="card">
+      <div class="card-head"><h3>Procurement priority matrix</h3>
+        <span class="spacer"></span><span class="sub faint">bubble size = exposure</span></div>
+      <div id="chartMatrix" class="chart"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Quadrants</h3></div>
+      <div class="matrix" id="matrixQuads"></div></div>
+  </div>
+
+  <div class="section grid g23">
+    <div class="card">
+      <div class="card-head"><h3>Monthly procurement exposure</h3></div>
+      <div id="chartBomMonthly" class="chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Commodity → BOM → project flow</h3></div>
+      <div class="flow" id="flowChain"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= QUOTES ============================ -->
+<section class="page" id="page-quotes">
+  <div class="section">
+    <div class="section-head"><h2>Supplier quotations</h2>
+      <span class="sub">Landed cost ranks suppliers · basic ex-plant price is benchmarked</span></div>
+    <div class="card pad0"><div id="quotesTable"></div></div>
+    <div id="quotesNote"></div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <div class="card-head"><h3>Enter a quotation</h3></div>
+      <form onsubmit="App.submitQuote(event)">
+        <div class="grid g4" style="gap:8px">
+          <div class="field"><label>Supplier *</label><input name="supplier" required></div>
+          <div class="field"><label>Quote reference</label><input name="quote_ref"></div>
+          <div class="field"><label>Commodity *</label>
+            <select name="commodity"><option value="CU">Copper</option>
+              <option value="AL">Aluminium</option><option value="CRGO">CRGO</option>
+              <option value="STEEL">Steel</option><option value="OIL">Oil</option></select></div>
+          <div class="field"><label>Product</label>
+            <select name="product">
+              <option value="">—</option>
+              <option value="CU_CATHODE">Copper cathode</option>
+              <option value="CU_WIREROD">Copper wire rod</option>
+              <option value="AL_INGOT">Aluminium ingot</option>
+              <option value="AL_WIREROD">Aluminium wire rod</option>
+              <option value="AL_BILLET">Aluminium billet</option>
+              <option value="CRGO_M4">CRGO lamination</option>
+              <option value="STEEL_MS">MS plate</option>
+              <option value="OIL_TRF">Transformer oil</option>
+            </select></div>
+          <div class="field"><label>Quote date</label><input type="date" name="quote_date"></div>
+          <div class="field"><label>Valid until</label><input type="date" name="valid_until"></div>
+          <div class="field"><label>Price *</label><input type="number" name="price" step="0.01" required></div>
+          <div class="field"><label>Currency</label>
+            <select name="currency"><option>INR</option><option>USD</option><option>EUR</option></select></div>
+          <div class="field"><label>Unit</label>
+            <select name="unit"><option>MT</option><option>KG</option><option>LB</option></select></div>
+          <div class="field"><label>Freight INR/MT</label><input type="number" name="freight" step="0.01" value="0"></div>
+          <div class="field"><label>Premium INR/MT</label><input type="number" name="premium" step="0.01" value="0"></div>
+          <div class="field"><label>Tax %</label><input type="number" name="tax_pct" step="0.01" value="18"></div>
+          <div class="field"><label>MOQ MT</label><input type="number" name="moq_mt" step="0.01"></div>
+          <div class="field"><label>Payment terms</label><input name="payment_terms" placeholder="30 days credit"></div>
+          <div class="field"><label>Delivery days</label><input type="number" name="delivery_days" step="1"></div>
+          <div class="field"><label>Price basis</label>
+            <select name="price_basis"><option>EX_PLANT</option><option>DELIVERED</option>
+              <option>CIF</option><option>FOB</option></select></div>
+        </div>
+        <div class="field" style="margin-top:8px"><label>Remarks</label>
+          <input name="remarks" style="width:100%"></div>
+        <button class="btn primary" type="submit" style="margin-top:10px">Save &amp; benchmark</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= ALERTS ============================ -->
+<section class="page" id="page-alerts">
+  <div class="section">
+    <div class="section-head"><h2>Price &amp; procurement alerts</h2>
+      <span class="sub" id="alertCount"></span><span class="spacer"></span>
+      <button class="btn" onclick="App.evaluateAlerts()">Evaluate rules now</button></div>
+    <div class="card"><div id="alertList"></div></div>
+    <div class="card-note">Rules live in the <span class="mono">alert_rules</span> table so
+      thresholds change without a code deploy. Evaluation is idempotent per day — re-running
+      the daily job will not duplicate an alert that already fired.</div>
+  </div>
+</section>
+
+<!-- ============================ REPORTS ============================ -->
+<section class="page" id="page-reports">
+  <div class="section">
+    <div class="section-head"><h2>Supply chain KPI scorecard</h2>
+      <span class="spacer"></span>
+      <a class="btn sm" href="/api/data/export/pdf" target="_blank">Management PDF</a>
+      <a class="btn sm" href="/api/data/export/excel" download>Full workbook</a></div>
+    <div class="grid g2" id="procKpis"></div>
+  </div>
+
+  <div class="section grid g32">
+    <div class="card">
+      <div class="card-head"><h3>Historical transformer cost back-test</h3>
+        <span class="spacer"></span><span class="sub faint">BOM held constant, prices vary</span></div>
+      <div id="chartCostBacktest" class="chart lg"></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Back-test detail</h3></div>
+      <div id="backtestMeta"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Data quality control</h2>
+      <span class="sub">Missing dates, jumps, outliers, negative prices and stale feeds</span></div>
+    <div class="card pad0"><div id="qualityTable"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Data source log</h2></div>
+    <div class="card pad0"><div id="sourceLog"></div></div>
+  </div>
+</section>
+
+<!-- =========================== SETTINGS =========================== -->
+<section class="page" id="page-settings">
+  <div class="section grid g2">
+    <div class="card"><div class="card-head"><h3>Application configuration</h3></div>
+      <div id="cfgBlock"></div></div>
+    <div class="card"><div class="card-head"><h3>External sources</h3></div>
+      <div id="sourceCfg"></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>Source status</h2>
+      <span class="sub">A source without credentials reports UNAVAILABLE — it never invents a price</span></div>
+    <div class="card pad0"><div id="sourceStatus"></div></div>
+  </div>
+
+  <div class="section grid g2">
+    <div class="card"><div class="card-head"><h3>Procurement policy settings</h3></div>
+      <div id="settingsTable"></div></div>
+    <div class="card"><div class="card-head"><h3>Scheduler</h3></div><div id="schedBlock"></div>
+      <div class="card-head" style="margin-top:12px"><h3>Database</h3></div><div id="statsBlock"></div></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <b>TransformerProcure Intelligence</b> — commodity price tracking, forecasting and
+  transformer BOM cost exposure for power and solar transformer procurement.<br>
+  Recommendations are procurement decision-support signals derived from price, forecast,
+  volatility, BOM exposure and coverage data. They are not financial or investment advice.
+  Forecasts are statistical projections with back-tested error bands, not guarantees.
+  Every price carries its source, timestamp, currency, unit and basis; data classes
+  (live, verified historical, supplier quote, estimated, forecast, demo) are never blurred.
+</footer>
+
+<!-- ECharts is vendored locally so the dashboard works on an air-gapped
+     procurement desk. The CDN is only a fallback if the asset is missing. -->
+<script src="/assets/echarts.min.js"></script>
+<script>
+  if (typeof echarts === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"><\/script>');
+  }
+</script>
+<script src="/js/util.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/charts.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

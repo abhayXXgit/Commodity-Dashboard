@@ -1,0 +1,59 @@
+# TransformerProcure Intelligence — full stack
+#
+#   docker compose up -d --build
+#   open http://localhost:8000
+#
+# The app also runs with no database container at all (SQLite); drop the
+# `db` service and unset DATABASE_URL if you want the lightest possible setup.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: procure-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-procure}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-procure}
+      POSTGRES_DB: ${POSTGRES_DB:-procure}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # schema.sql runs once, on first initialisation of an empty volume
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-procure} -d ${POSTGRES_DB:-procure}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  app:
+    build: .
+    container_name: procure-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-procure}:${POSTGRES_PASSWORD:-procure}@db:5432/${POSTGRES_DB:-procure}
+      DATA_MODE: ${DATA_MODE:-DEMO}
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_HOST: 0.0.0.0
+      # Secrets stay in the environment and never reach the browser.
+      LME_API_URL: ${LME_API_URL:-}
+      LME_API_KEY: ${LME_API_KEY:-}
+      METALS_API_URL: ${METALS_API_URL:-}
+      METALS_API_KEY: ${METALS_API_KEY:-}
+      FX_API_URL: ${FX_API_URL:-https://api.exchangerate.host/latest}
+      FX_API_KEY: ${FX_API_KEY:-}
+      FALLBACK_USDINR: ${FALLBACK_USDINR:-88.50}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      # drop official producer circulars here to have them ingested on refresh
+      - ./data/imports:/app/data/imports
+      - ./reports:/app/reports
+
+volumes:
+  pgdata:

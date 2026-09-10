@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/forecast_cache/
+reports/*.pdf
+reports/*.xlsx
+reports/*.log
+.git/
+.pytest_cache/
