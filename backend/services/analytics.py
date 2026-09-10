@@ -356,6 +356,21 @@ def copper_parity(db) -> dict[str, Any]:
         return {"available": False, "message": "Copper parity needs both LME and Indian series"}
 
     joined = pd.concat([lme.rename("lme_inr"), ind.rename("india")], axis=1).dropna()
+
+    # TODAY's parity must use TODAY's exchange rate. The stored price_inr_mt was
+    # normalised with the rate that applied when the row was ingested, which is
+    # right for a historical point and wrong for the current one - and reporting
+    # the live rate next to a figure converted at an older rate is worse than
+    # either, because the two do not reconcile.
+    fx_note = None
+    if not lme_usd.empty and fx:
+        recomputed = float(lme_usd.iloc[-1]) * float(fx)
+        stored = float(joined["lme_inr"].iloc[-1])
+        if abs(recomputed - stored) / max(stored, 1) > 0.001:
+            fx_note = (f"Latest point re-converted at the current rate "
+                       f"({fx:.4f}); the stored value used {stored / float(lme_usd.iloc[-1]):.4f}.")
+        joined.iloc[-1, joined.columns.get_loc("lme_inr")] = recomputed
+
     joined["premium"] = joined["india"] - joined["lme_inr"]
     joined["premium_pct"] = joined["premium"] / joined["lme_inr"] * 100
 
@@ -365,6 +380,7 @@ def copper_parity(db) -> dict[str, Any]:
         "usdinr": round(fx, 4),
         "usdinr_date": fx_date.isoformat() if fx_date else None,
         "usdinr_source": fx_src,
+        "fx_note": fx_note,
         "lme_usd": round(float(lme_usd.iloc[-1]), 2) if not lme_usd.empty else None,
         "lme_inr_equivalent": round(float(joined["lme_inr"].iloc[-1]), 2),
         "india_price": round(float(joined["india"].iloc[-1]), 2),

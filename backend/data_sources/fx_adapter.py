@@ -38,26 +38,42 @@ class FxAdapter(BaseAdapter):
             headers = {"Accept": "application/json"}
             if settings.FX_API_KEY:
                 headers["apikey"] = settings.FX_API_KEY
-            payload = http_get_json(settings.FX_API_URL,
-                                    params={"base": bases[0], "symbols": "INR"}, headers=headers)
-            rates = payload.get("rates") or {}
+
             out: list[FxQuote] = []
-            if "INR" in rates:
-                out.append(FxQuote(dt.date.today(), bases[0], "INR", float(rates["INR"]),
-                                   self.source_name, "LIVE"))
-            for b in bases[1:]:
-                p2 = http_get_json(settings.FX_API_URL,
-                                   params={"base": b, "symbols": "INR"}, headers=headers)
-                r2 = (p2.get("rates") or {}).get("INR")
-                if r2:
-                    out.append(FxQuote(dt.date.today(), b, "INR", float(r2),
+            for b in bases:
+                payload = self._request(b, headers)
+                rates = payload.get("rates") or payload.get("conversion_rates") or {}
+                # some providers answer with success=false rather than an HTTP error
+                if payload.get("success") is False or payload.get("result") == "error":
+                    err = (payload.get("error") or {}).get("info") or payload.get("error-type")
+                    raise RuntimeError(f"provider rejected the request: {err}")
+                inr = rates.get("INR")
+                if inr:
+                    out.append(FxQuote(dt.date.today(), b, "INR", float(inr),
                                        self.source_name, "LIVE"))
+
             if out:
                 return out, STATUS_SUCCESS, None
             return self._fallback(bases), STATUS_UNAVAILABLE, "FX response contained no INR rate"
         except Exception as exc:                                    # noqa: BLE001
             log.warning("FX fetch failed: %s - using configured fallback", exc)
             return self._fallback(bases), STATUS_UNAVAILABLE, f"{type(exc).__name__}: {exc}"
+
+    @staticmethod
+    def _request(base: str, headers: dict):
+        """
+        Fetch one base currency, tolerating the two URL shapes providers use.
+
+        Path style  : https://open.er-api.com/v6/latest/USD
+        Query style : https://api.example.com/latest?base=USD&symbols=INR
+
+        Guessing wrong yields a 404 or an empty rate set, so the shape is
+        decided by the configured URL rather than assumed.
+        """
+        url = settings.FX_API_URL.rstrip("/")
+        if url.endswith("/latest") or url.endswith("/v6/latest"):
+            return http_get_json(f"{url}/{base}", headers=headers)
+        return http_get_json(url, params={"base": base, "symbols": "INR"}, headers=headers)
 
     @staticmethod
     def _fallback(bases) -> list[FxQuote]:
