@@ -568,9 +568,64 @@ const SA = (() => {
   const renderers = { dashboard, copper, aluminium, historical, forecast, bom,
                       quotes, alerts, kpi };
 
+  /* ------------------------------------------------------- freshness ----
+   * When this page is served from a web address it polls a tiny version file
+   * and reloads itself if a newer build has been published. The file is a few
+   * hundred bytes, so a 5-minute poll costs almost nothing - reloading the
+   * 1.6 MB page itself on a timer would burn gigabytes an hour and show the
+   * same numbers every time, because the build only changes once a day.
+   *
+   * Opened from disk (file://) there is nothing to poll, so this quietly does
+   * nothing and the page stays exactly as self-contained as before.
+   * -------------------------------------------------------------------- */
+  const FRESHNESS_POLL_MS = 5 * 60 * 1000;
+
+  function ageText(iso) {
+    const mins = (Date.now() - new Date(iso).getTime()) / 60000;
+    if (mins < 90) return `${Math.max(0, Math.round(mins))} min old`;
+    const hrs = mins / 60;
+    if (hrs < 36) return `${Math.round(hrs)} h old`;
+    return `${Math.round(hrs / 24)} days old`;
+  }
+
+  function paintFreshness() {
+    const el = U.el('freshness');
+    if (!el) return;
+    const built = new Date(D.generated_at);
+    const stale = (Date.now() - built.getTime()) > 36 * 3600 * 1000;
+    el.className = 'pill ' + (stale ? 'stale' : 'live');
+    el.title = `Built ${built.toLocaleString('en-IN')}`;
+    el.innerHTML = `<span class="dot"></span>${ageText(D.generated_at)}`;
+  }
+
+  async function checkForNewBuild() {
+    if (location.protocol === 'file:') return;          // opened from disk
+    try {
+      const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return;
+      const v = await res.json();
+      if (v.generated_at && v.generated_at !== D.generated_at) {
+        const n = U.el('freshness');
+        if (n) {
+          n.className = 'pill demo';
+          n.innerHTML = '<span class="dot"></span>New build - refreshing';
+        }
+        setTimeout(() => location.reload(), 1200);
+      }
+    } catch (e) {
+      /* offline, or no version file: leave the page alone */
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.nav button').forEach(b => b.onclick = () => go(b.dataset.page));
     banner();
+    paintFreshness();
+    setInterval(paintFreshness, 60000);
+    if (location.protocol !== 'file:') {
+      checkForNewBuild();
+      setInterval(checkForNewBuild, FRESHNESS_POLL_MS);
+    }
     const p = U.el('statusPill');
     if (p) p.innerHTML = `<span class="dot"></span>${new Date(D.generated_at).toLocaleDateString('en-IN')}`;
     dashboard();
