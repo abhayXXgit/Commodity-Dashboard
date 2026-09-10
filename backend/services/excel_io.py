@@ -165,6 +165,16 @@ def import_prices(db, content: bytes | None = None, path: str | Path | None = No
     else:
         raise ValueError("import_prices needs either content or path")
 
+    # A format demonstration must never be imported as a real observation.
+    from backend.data_sources.circular_adapter import looks_like_a_sample
+    if looks_like_a_sample(filename) and data_class != "DEMO_DATA":
+        return {"ok": False, "filename": filename,
+                "error": ("This file name marks it as a sample or template. Importing it "
+                          "would record invented figures as verified prices. Rename it to "
+                          "the real circular's name if it is genuine, or import it "
+                          "explicitly with data_class=DEMO_DATA."),
+                "expected_columns": REQUIRED_COLUMNS}
+
     df, colmap, missing = _map_columns(df)
 
     # Fill in what the sheet does not state, from the filename.

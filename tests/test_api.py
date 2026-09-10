@@ -364,6 +364,38 @@ class TestDataIO:
         assert infer_product("P1020A Ingot", "AL") == "AL_INGOT"
         assert infer_product("Cathode", "CU") == "CU_CATHODE"
 
+    def test_sample_files_cannot_become_real_prices(self, client):
+        """
+        A format demonstration must never be recorded as a published price.
+
+        The shipped example circular was being auto-ingested and stamped
+        "NALCO official price circular / VERIFIED_HISTORICAL" - invented figures
+        entering as trusted data, which the data-class precedence rule would
+        then rank above everything else.
+        """
+        import io
+
+        import pandas as pd
+
+        from backend.data_sources.circular_adapter import looks_like_a_sample
+
+        assert looks_like_a_sample("nalco_circular_sample.xlsx")
+        assert looks_like_a_sample("NALCO Example Sept.xlsx")
+        assert looks_like_a_sample("balco_template.csv")
+        assert looks_like_a_sample("hindalco-demo.xls")
+        # a genuine circular must still be accepted
+        assert not looks_like_a_sample("nalco_2026-09.xlsx")
+        assert not looks_like_a_sample("HINDALCO wef 01092026.xlsx")
+
+        buf = io.BytesIO()
+        pd.DataFrame([{"Date": "2026-02-02", "Product": "Ingot", "Price": 999999,
+                       "Currency": "INR", "Unit": "MT"}]).to_excel(buf, index=False)
+        r = client.post("/api/data/import",
+                        files={"file": ("nalco_sample.xlsx", buf.getvalue(),
+                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+        assert r.status_code == 400
+        assert "sample or template" in r.json()["detail"]
+
     def test_import_rejects_a_non_spreadsheet(self, client):
         r = client.post("/api/data/import",
                         files={"file": ("evil.exe", b"MZ", "application/octet-stream")})

@@ -19,6 +19,9 @@ from pathlib import Path
 
 from backend.config import settings
 from backend.data_sources.base import BaseAdapter, PriceRecord, http_get_json
+from backend.utils.logging_config import get_logger
+
+log = get_logger(__name__)
 
 # Column aliases accepted in an uploaded circular workbook
 COL_ALIASES = {
@@ -35,6 +38,18 @@ COL_ALIASES = {
 
 def _norm(s: str) -> str:
     return str(s).strip().lower().replace(" ", "_").replace("-", "_").replace(".", "")
+
+
+# Filenames that are format demonstrations, not published circulars. Ingesting
+# one would stamp invented figures as VERIFIED_HISTORICAL under a producer's
+# name - and, because verified data outranks demo data, those figures would then
+# be trusted over everything else. A sample must never become a price.
+SAMPLE_TOKENS = ("sample", "example", "template", "demo", "dummy", "test", "mock")
+
+
+def looks_like_a_sample(name: str) -> bool:
+    stem = _norm(Path(name).stem)
+    return any(tok in stem for tok in SAMPLE_TOKENS)
 
 
 class ProducerCircularAdapter(BaseAdapter):
@@ -78,6 +93,10 @@ class ProducerCircularAdapter(BaseAdapter):
             if path.suffix.lower() not in (".xlsx", ".xls", ".csv"):
                 continue
             if pattern not in path.name.lower():
+                continue
+            if looks_like_a_sample(path.name):
+                log.warning("skipping %s - it looks like a format sample, not a "
+                            "published circular. Rename it if it is genuine.", path.name)
                 continue
             df = pd.read_csv(path) if path.suffix.lower() == ".csv" else pd.read_excel(path)
             df.columns = [_norm(c) for c in df.columns]
