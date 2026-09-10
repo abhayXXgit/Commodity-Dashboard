@@ -71,20 +71,52 @@ jobs:
           print("alerts raised:", out["alerts"]["count"])
           PY
 
+      # Back-testing twelve models across nine series is the slow step, and a
+      # shared runner is slower than a laptop. It is allowed to run out of time
+      # without failing the build: the dashboard degrades to "no forecast stored"
+      # for any series it did not reach, which is honest and still useful. A
+      # publish that fails entirely because a model was slow helps nobody.
       - name: Train the forecast models
+        continue-on-error: true
+        timeout-minutes: 12
         env:
           ENABLE_SCHEDULER: "false"
         run: |
           python - <<'PY'
-          from backend.services.forecast_service import refresh_forecasts
-          out = refresh_forecasts(folds=2)
+          from backend.services.forecast_service import refresh_forecasts, DEFAULT_SERIES
+
+          # Headline series first, so a timeout costs the least important ones.
+          priority = ["CU|BME|CU_CATHODE", "AL|NALCO|AL_INGOT", "CU|LME|CU_CATHODE",
+                      "AL|NALCO|AL_WIREROD"]
+          ordered = sorted(
+              DEFAULT_SERIES,
+              key=lambda s: priority.index(f"{s[0]}|{s[1]}|{s[2]}")
+              if f"{s[0]}|{s[1]}|{s[2]}" in priority else 99)
+
+          out = refresh_forecasts(series=ordered, folds=2)
           print(f"{len(out['succeeded'])} series trained, {len(out['failed'])} failed")
           for f in out["failed"]:
               print("   FAILED:", f)
           PY
 
       - name: Build the single-file dashboard
-        run: python -m backend.services.build_standalone
+        run: |
+          python -m backend.services.build_standalone
+          python - <<'PY'
+          # Refuse to publish something broken or empty.
+          import base64, json, re, pathlib
+          h = pathlib.Path("frontend/standalone.html").read_text(encoding="utf-8")
+          assert len(h) > 500_000, f"standalone.html is only {len(h)} bytes"
+          m = re.search(r'type="application/base64">([^<]+)<', h)
+          assert m, "no data payload embedded"
+          d = json.loads(base64.b64decode(m.group(1)))
+          assert d["series"], "no price series in the payload"
+          assert d["rollup"]["transformers"], "no transformer projects in the payload"
+          assert h.count('script src="http') == 0, "page depends on an external script"
+          print(f"  ok: {len(h)/1e6:.2f} MB, {len(d['series'])} series, "
+                f"{len(d['rollup']['transformers'])} projects, "
+                f"USD/INR {d['parity']['usdinr']}")
+          PY
 
       - name: Assemble the site
         run: |
