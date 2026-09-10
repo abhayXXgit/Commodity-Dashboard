@@ -71,11 +71,12 @@ jobs:
           print("alerts raised:", out["alerts"]["count"])
           PY
 
-      # Back-testing twelve models across nine series is the slow step, and a
-      # shared runner is slower than a laptop. It is allowed to run out of time
-      # without failing the build: the dashboard degrades to "no forecast stored"
-      # for any series it did not reach, which is honest and still useful. A
-      # publish that fails entirely because a model was slow helps nobody.
+      # Back-testing twelve models across nine series takes ~2.5 minutes with
+      # folds=2 (measured), so the cap below is generous even on a slow runner.
+      # It is kept, along with the priority ordering, as cheap insurance: if a
+      # model ever hangs, the dashboard degrades to "no forecast stored" for the
+      # series it did not reach - honest and still useful - rather than the whole
+      # publish failing and leaving yesterday's page up with no explanation.
       - name: Train the forecast models
         continue-on-error: true
         timeout-minutes: 12
